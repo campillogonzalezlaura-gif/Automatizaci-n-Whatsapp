@@ -2,6 +2,7 @@ import express from "express";
 import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
+import { randomUUID } from "crypto";
 import dotenv from "dotenv";
 
 dotenv.config({ path: ".env.local" });
@@ -80,6 +81,80 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+// --- APPOINTMENTS API ---
+
+interface Appointment {
+  id: string;
+  patientName: string;
+  treatment: string;
+  date: string;
+  time: string;
+  status: "Pendiente" | "Confirmada" | "Cancelada";
+  createdAt: string;
+}
+
+// In-memory store (replace with real DB in production)
+const appointments: Appointment[] = [];
+
+// GET all appointments
+app.get("/api/appointments", (_req, res) => {
+  res.json(appointments);
+});
+
+// POST a new appointment
+app.post("/api/appointments", (req, res) => {
+  const { patientName, treatment, date, time } = req.body;
+
+  if (!patientName || !treatment || !date || !time) {
+    return res.status(400).json({ error: "Faltan datos obligatorios: patientName, treatment, date, time." });
+  }
+
+  const newAppointment: Appointment = {
+    id: randomUUID(),
+    patientName,
+    treatment,
+    date,
+    time,
+    status: "Pendiente",
+    createdAt: new Date().toISOString(),
+  };
+
+  appointments.push(newAppointment);
+  res.status(201).json(newAppointment);
+});
+
+// PUT update appointment status
+app.put("/api/appointments/:id", (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  const index = appointments.findIndex((a) => a.id === id);
+  if (index === -1) {
+    return res.status(404).json({ error: "Cita no encontrada." });
+  }
+
+  const valid = ["Pendiente", "Confirmada", "Cancelada"] as const;
+  if (!valid.includes(status)) {
+    return res.status(400).json({ error: "Estado no válido." });
+  }
+
+  appointments[index].status = status;
+  res.json(appointments[index]);
+});
+
+// DELETE / cancel appointment
+app.delete("/api/appointments/:id", (req, res) => {
+  const { id } = req.params;
+  const index = appointments.findIndex((a) => a.id === id);
+
+  if (index === -1) {
+    return res.status(404).json({ error: "Cita no encontrada." });
+  }
+
+  appointments.splice(index, 1);
+  res.status(204).send();
+});
+
 // --- EXISTING API ROUTES ---
 
 const SYSTEM_INSTRUCTION = `
@@ -89,6 +164,20 @@ Eres "Aura", la asistente virtual inteligente para una clínica de estética en 
 - Utiliza siempre **Castellano de España**. 
 - Sé siempre cortés, cercana (usa el "tú" con elegancia), impecable en la ortografía y usa emojis de forma moderada y elegante (ej: ✨, 🌸, 🗓️, 🩺).
 - Tus respuestas deben ser directas y fáciles de leer en una pantalla de móvil (usa saltos de línea y viñetas).
+
+### 1.5. GESTIÓN DE CITAS (AGENDAMIENTO)
+Puedes ayudar al usuario a AGENDAR una cita directamente. Sigue estos pasos de forma conversacional, preguntando solo UN dato por mensaje:
+
+1. Si el usuario dice "quiero agendar cita", pregúntale su **nombre completo**.
+2. Después pregúntale el **tratamiento** que desea (de la lista: Bótox, Ácido Hialurónico, Higiene Facial, Microblading, Pestañas (Lifting y Extensiones), Tratamientos Corporales, Depilación Láser, Manicura y Pedicura, Maquillaje).
+3. Luego pregunta la **fecha** deseada (formato DD/MM/AAAA).
+4. Finalmente pregunta la **hora** deseada (formato HH:MM).
+
+Cuando tengas los 4 datos (nombre, tratamiento, fecha, hora), confirma todos los datos con el usuario antes de finalizar con: "Perfecto, ya tengo todos los datos. Te confirmo tu cita y la verás reflejada en tu panel de citas. 🗓️"
+
+Si el usuario quiere **MODIFICAR o CANCELAR** una cita, derívalo amablemente al equipo humano con este mensaje: "Para modificar o cancelar tu cita, necesitaré que te pongas en contacto directamente con nuestro equipo, que te ayudará al instante. ✨"
+
+El sistema registrará la cita automáticamente del lado del frontend. No respondas con etiquetas JSON ni códigos especiales.
 
 ### 2. POLÍTICA DE SEGURIDAD MÉDICA Y LIMITACIONES (CRÍTICO)
 - NO eres médico. Tienes estrictamente PROHIBIDO dar diagnósticos, recetar medicamentos o evaluar fotos de la piel de los pacientes.
@@ -111,8 +200,8 @@ Utiliza la siguiente información para responder dudas. Si te preguntan por algo
 - **Maquillaje:** Servicios profesionales para eventos, novias o social, resaltando tus rasgos de forma elegante y personalizada.
 
 ### 4. GESTIÓN DE CITAS Y PRECIOS
-- No tienes acceso directo a la agenda en tiempo real, ni puedes cobrar.
-- Si el usuario quiere **RESERVAR, CAMBIAR o CANCELAR** una cita, o pregunta por **PRECIOS EXACTOS**, debes responder: "Con gusto te ayudo a gestionar tu solicitud. Déjame tu nombre completo y el tratamiento de tu interés, y en un momento un compañero del equipo humano te escribirá por aquí para confirmarlo todo. 🗓️"
+- No tienes acceso directo a la agenda en tiempo real ni puedes cobrar.
+- Si el usuario pregunta por **PRECIOS EXACTOS**, responde: "No puedo proporcionarte precios exactos de forma automática, pero un compañero del equipo te compartirá toda la información sin compromiso. 🗓️"
 
 ### 5. RESPUESTA A RECORDATORIOS DE CITAS
 - Si el usuario responde a un recordatorio automático confirmando la asistencia (ej: "Sí, ahí estaré", "Confirmado"), responde: "¡Perfecto! Queda confirmada tu asistencia. Recuerda venir sin maquillaje si tu tratamiento es facial. ¡Te esperamos mañana! 🌸"
@@ -136,7 +225,20 @@ app.post("/api/chat", async (req, res) => {
     });
 
     const result = await chat.sendMessage({ message });
-    res.json({ text: result.text });
+    const aiText = result.text || "";
+
+    // Detecta si la IA ha devuelto un bloque de confirmación de cita
+    const appointmentMatch = aiText.match(/nombre=(.+?)\|tratamiento=(.+?)\|fecha=(.+?)\|hora=(.+?)(?:\s|$)/);
+
+    if (appointmentMatch) {
+      const [, patientName, treatment, date, time] = appointmentMatch;
+      res.json({
+        text: aiText,
+        appointment: { patientName: patientName.trim(), treatment: treatment.trim(), date: date.trim(), time: time.trim() }
+      });
+    } else {
+      res.json({ text: aiText });
+    }
   } catch (error: any) {
     console.error("Chat error:", error);
     res.status(500).json({ error: error.message || "An error occurred during the chat." });
