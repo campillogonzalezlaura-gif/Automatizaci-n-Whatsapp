@@ -553,8 +553,8 @@ export default function App() {
 
   // --- VISTA DE CHAT (sección interna del wrapper) ---
   const ChatView = () => (
-    <>
-      {/* Messages */}
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Messages - ocupa todo el espacio disponible */}
       <section className="flex-1 overflow-y-auto px-4 md:px-12 py-8 space-y-8 scrollbar-hide bg-natural-bg/30">
         <AnimatePresence initial={false}>
           {messages.map((msg, idx) => (
@@ -621,7 +621,7 @@ export default function App() {
           </form>
         </div>
       </footer>
-    </>
+    </div>
   );
 
   return (
