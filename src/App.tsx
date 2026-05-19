@@ -91,11 +91,15 @@ export default function App() {
       const newAppt = await res.json();
       setAppointments(prev => [...prev, newAppt]);
       setBookingSuccess(true);
+      // Recargar citas desde backend
+      const refreshed = await fetch('/api/appointments').then(r => r.json());
+      setAppointments(Array.isArray(refreshed) ? refreshed : []);
       setTimeout(() => {
         setShowBookingForm(false);
         setBookingName(''); setBookingTreatment(''); setBookingDate(''); setBookingTime('');
         setBookingSuccess(false);
-      }, 2500);
+        setBookingError('');
+      }, 2000);
     } catch (err: any) {
       setBookingError(err.message);
     } finally {
@@ -533,6 +537,29 @@ export default function App() {
                         })}
                       </div>
                     </div>
+
+                    {/* Mensaje de exito superpuesto */}
+                    <AnimatePresence>
+                      {bookingSuccess && (
+                        <motion.div
+                          key="booking-success-banner"
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="mb-6 bg-green-50 border border-green-200 rounded-2xl px-6 py-4 flex items-center gap-4"
+                        >
+                          <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center shrink-0">
+                            <CheckCircle2 size={20} className="text-green-600" />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-green-800">Cita agendada correctamente</p>
+                            <p className="text-xs text-green-700">
+                              {bookingTreatment} — {formatDate(parseDateInput(bookingDate))} a las {bookingTime}
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
 
                     {/* Botón "Nueva Cita" */}
                     <motion.button
