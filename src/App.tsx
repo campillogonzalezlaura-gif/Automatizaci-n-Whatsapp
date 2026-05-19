@@ -173,8 +173,8 @@ export default function App() {
   const dayNames = ['Lun', 'Mar', 'Mié', 'Jue', 'Vié', 'Sáb', 'Dom'];
 
   const daysInMonth = getDaysInMonth(calendarMonth.getFullYear(), calendarMonth.getMonth());
-  const firstDayOffset = getFirstDayOfMonth(calendarMonth.getFullYear(), calendarMonth.getMonth()); // 0=Dom, ajustamos a 6=Dom
-  let adjustedOffset = firstDayOffset === 0 ? 6 : firstDayOffset - 1; // 0=Lun, 6=Dom
+  const firstDayOffset = getFirstDayOfMonth(calendarMonth.getFullYear(), calendarMonth.getMonth());
+  let adjustedOffset = firstDayOffset === 0 ? 6 : firstDayOffset - 1;
 
   const calendarDays: (number | null)[] = [];
   for (let i = 0; i < adjustedOffset; i++) calendarDays.push(null);
@@ -189,13 +189,11 @@ export default function App() {
     return appointments.filter(a => a.date === dStr);
   };
 
-  // Format date for display
   const formatDate = (isoDate: string) => {
     const [y, m, d] = isoDate.split('-');
     return `${d}/${m}/${y}`;
   };
 
-  // --- QUICK ACTIONS ---
   const QuickAction = ({ icon: Icon, text, onClick }: { icon: any, text: string, onClick: () => void }) => (
     <button
       onClick={onClick}
@@ -263,7 +261,7 @@ export default function App() {
         </div>
       </aside>
 
-      {/* Main Area */}
+      {/* Main Chat Area */}
       <main className="flex-1 flex flex-col relative w-full overflow-hidden">
         {/* Header */}
         <header className="h-20 bg-white/80 backdrop-blur-md border-b border-natural-border px-6 md:px-8 flex items-center justify-between sticky top-0 z-20">
@@ -329,7 +327,7 @@ export default function App() {
                 <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
                   <QuickAction icon={Info} text="Tratamientos" onClick={() => handleSend(undefined, "¿Qué tratamientos ofrecéis?")} />
                   <QuickAction icon={Calendar} text="Agendar Cita" onClick={() => handleSend(undefined, "Quisiera agendar una cita")} />
-                  <QuickAction icon={Sparkles} text="Microblading" onClick={() => handleSend(undefined, "¿En qué consiste el microblading?")} />
+                  <QuickAction icon={Sparkles} text="Microblading" onClick={() => handleSend(undefined, "¿en qué consiste el microblading?")} />
                   <QuickAction icon={ShieldAlert} text="Cuidados" onClick={() => handleSend(undefined, "¿Cuáles son los cuidados recomendados?")} />
                 </div>
 
@@ -355,7 +353,7 @@ export default function App() {
         ) : (
           /* === VISTA DE CITAS AGENDADAS === */
           <section className="flex-1 overflow-y-auto px-6 md:px-12 py-12 bg-natural-bg/30">
-            <div className="max-w-3xl mx-auto">
+            <div className="max-w-3xl mx-auto space-y-6">
               {/* Header de la vista */}
               <div className="flex items-center justify-between mb-8">
                 <div>
@@ -512,7 +510,6 @@ export default function App() {
                         ))}
                         {calendarDays.map((d, i) => {
                           const dStr = d ? `${calendarMonth.getFullYear()}-${String(calendarMonth.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}` : '';
-                          const dayAppts = d ? getAppointmentsForDay(d) : [];
                           const highlighted = appointmentDates.has(dStr);
                           return (
                             <div
@@ -526,7 +523,7 @@ export default function App() {
                                   ? 'bg-natural-accent/15 text-natural-heading font-bold'
                                   : 'text-stone-600 hover:bg-natural-sidebar'
                               }`}
-                              title={highlighted ? `${dayAppts.length} cita(s)` : ''}
+                              title={highlighted ? `${getAppointmentsForDay(d!).length} cita(s)` : ''}
                             >
                               {d}
                               {highlighted && !isToday(d!) && (
@@ -590,7 +587,7 @@ export default function App() {
                                 <div className="flex items-center gap-3 mt-1 text-xs text-stone-500 font-medium">
                                   <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(appt.date)}</span>
                                   <span className="flex items-center gap-1"><Clock size={14} /> {appt.time}</span>
-                        </div>
+                                </div>
                                 <p className="text-[11px] text-stone-400 mt-1">👤 {appt.patientName}</p>
                               </div>
                             </div>
