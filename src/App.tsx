@@ -594,7 +594,7 @@ export default function App() {
       </section>
 
       {/* Input Area */}
-      <footer className="p-6 bg-white border-t border-natural-border">
+      <footer className="p-4 bg-white border-t border-natural-border mt-auto">
         <div className="max-w-4xl mx-auto">
           <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
             <QuickAction icon={Info} text="Tratamientos" onClick={() => handleSend(undefined, "¿Qué tratamientos ofrecéis?")} />
